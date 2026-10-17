@@ -5,6 +5,7 @@ edition = "2024"
 rust-version = "1.95"
 description = "Finds duplicate, resized and edited copies of images and videos using the GPU"
 license = "MIT"
+repository = "https://github.com/stackrot/doppel"
 readme = "README.md"
 keywords = ["duplicates", "dedupe", "images", "video", "gpu"]
 categories = ["command-line-utilities", "multimedia"]
