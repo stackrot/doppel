@@ -49,7 +49,8 @@ pub struct Group {
 	pub kind: Kind,
 	/// Loosest link holding the group together.
 	pub link: Link,
-	/// Best-ranked (suggested keeper) first.
+	/// Suggested keeper first: the best-ranked member, or in similar
+	/// groups the leader.
 	pub members: Vec<Member>,
 }
 
@@ -363,9 +364,19 @@ fn components(
 			}));
 		}
 		members.sort_by(|a, b| by_rank(&a.entry, &b.entry));
+		let link = members.iter().map(|m| m.link).max().unwrap();
+		// Edits can outrank their source (a border adds pixels, a
+		// re-save adds bytes), so suggest the leader instead: the file
+		// everything else matched, usually the original.
+		if link == Link::Similar {
+			let lead =
+				members.iter().position(|m| m.leader).unwrap();
+			let leader = members.remove(lead);
+			members.insert(0, leader);
+		}
 		groups.push(Group {
 			kind: entries[members[0].entry].kind,
-			link: members.iter().map(|m| m.link).max().unwrap(),
+			link,
 			members,
 		});
 	}

@@ -84,10 +84,12 @@ hardlinks to the same file once.
 | `T` | Move every marked file to the Trash |
 | `q` | Quit |
 
-The best file in each group (most pixels, then longest, highest bitrate,
-largest, oldest) is listed first with a star. In exact and near groups,
-everything else starts marked. In similar groups, only spare copies of
-byte-identical files start marked; those share a letter in the `≡` column.
+The suggested keeper is listed first with a star. In exact and near groups
+it is the best file (most pixels, then longest, highest bitrate, largest,
+oldest) and everything else starts marked. In similar groups it is the file
+the others were matched against, usually the original, and only spare
+copies of byte-identical files start marked; those share a letter in the
+`≡` column.
 Files go to the freedesktop Trash, so you can restore them, and doppel will
 not empty a group completely.
 
