@@ -9,6 +9,11 @@ the copies you don't want to the Trash.
 It needs a GPU with a Vulkan driver. There is no CUDA or ROCm dependency,
 so AMD cards work out of the box.
 
+![doppel scanning a small library, then reviewing groups of edited photos and re-encoded videos in kitty](docs/demo.gif)
+
+The demo runs on a small library built from the sample corpus described
+below. The scan is shown at four times its real speed.
+
 ## What it finds
 
 | Match | Meaning |
@@ -151,7 +156,9 @@ python -I tools/score.py ROOT out.json
 ```
 
 `tools/fit_prior.py` recomputes `assets/whiten-prior.bin` from a cache
-filled by running doppel on the corpus.
+filled by running doppel on the corpus. `tools/make_demo.py` builds the demo
+library from the corpus, and `tools/record_demo.py` records the GIF above in
+a headless kitty session (it needs cage, wf-recorder and gifski).
 
 ## Licence
 
