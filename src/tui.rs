@@ -294,6 +294,8 @@ impl App<'_> {
 			}
 			return true;
 		}
+		// Messages last until the next key, then the key help returns.
+		self.status.clear();
 		let (g, m) = (self.group(), self.member());
 		let members = self.groups[g].members.len();
 		match code {
