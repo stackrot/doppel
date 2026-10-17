@@ -579,7 +579,7 @@ impl App<'_> {
 					Row::new(vec![
 					Cell::from(mark),
 					Cell::from(if i == 0 { "★" } else { "" }),
-					Cell::from(set).cyan(),
+					Cell::from(Span::raw(set).cyan()),
 					Cell::from(Span::styled(
 						format!("{} {:.2}", m.link.label(), m.score),
 						Style::new().fg(link_colour(m.link)),
