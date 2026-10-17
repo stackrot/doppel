@@ -5,6 +5,8 @@ default the COCO originals of the sample corpus) and writes their mean and
 covariance as assets/whiten-prior.bin: b"DPWP", u32 dim, f32 mean[dim],
 f32 cov[dim * dim], all little-endian.
 
+Needs numpy.
+
 python -I tools/fit_prior.py CACHE.sqlite OUT [MATCH]
 """
 

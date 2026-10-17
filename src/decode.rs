@@ -294,7 +294,7 @@ pub fn sample(img: &RgbImage) -> Sample {
 }
 
 /// Centre square covering SIDE/SHORT of the region's short side, resampled
-/// to SIDE x SIDE — the same region DINOv2's resize-then-crop keeps.
+/// to SIDE x SIDE: the region DINOv2's resize-then-crop keeps.
 fn sample_in(img: &RgbImage, r: &Region) -> Sample {
 	let (w, h) = (r.w as f64, r.h as f64);
 	let side = w.min(h) * SIDE as f64 / SHORT as f64;

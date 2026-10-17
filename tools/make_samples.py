@@ -1,15 +1,8 @@
 """Build a doppel test corpus with known ground truth.
 
-Expects ROOT/downloads/ to hold, one per directory:
-  coco-val/val2017.zip, coco-test/test2017.zip  (images.cocodataset.org/zips)
-  bbb/bbb.mov.zip      peach/bigbuckbunny_movies/big_buck_bunny_1080p_h264.mov.zip
-  sintel/sintel.mkv    durian/movies/Sintel.2010.1080p.mkv
-  tos/tos.mov          demo/movies/ToS/tears_of_steel_720p.mov
-  ed/ed.mov            ED/elephantsdream-720-h264-st-aac.mov
-  cycles/cycles.mov    demo/movies/Cycles_Demoreel_2015.mov
-  reel/reel.mov        demo/movies/Blender_reel_2013.mov
-(movie paths relative to https://download.blender.org/). Writes ROOT/corpus/
-and ROOT/manifest.json. Needs Pillow, pillow-heif, ffmpeg and cjxl.
+Fetch the sources first with tools/fetch_samples.sh ROOT (COCO 2017 photos
+and Blender open movies). This writes ROOT/corpus/ and ROOT/manifest.json.
+It needs Pillow, pillow-heif, ffmpeg and cjxl.
 
   python -I tools/make_samples.py ROOT
 """

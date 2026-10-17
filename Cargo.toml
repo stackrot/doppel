@@ -2,7 +2,12 @@
 name = "doppel"
 version = "0.1.0"
 edition = "2024"
-description = "Hardware-saturating duplicate finder for images and videos"
+rust-version = "1.95"
+description = "Finds duplicate, resized and edited copies of images and videos using the GPU"
+license = "MIT"
+readme = "README.md"
+keywords = ["duplicates", "dedupe", "images", "video", "gpu"]
+categories = ["command-line-utilities", "multimedia"]
 
 [dependencies]
 anyhow = "1"

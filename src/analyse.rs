@@ -11,7 +11,7 @@ use std::time::Duration;
 use anyhow::Result;
 use crossbeam_channel::{Receiver, Sender, bounded};
 use half::f16;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use indicatif::{MultiProgress, ProgressBar, ProgressState, ProgressStyle};
 use rayon::prelude::*;
 
 use crate::cache::{Cache, Info, Record};
@@ -84,12 +84,18 @@ fn todo(entries: &[Entry], records: &[Record], kind: Kind) -> Vec<usize> {
 		.collect()
 }
 
+/// Whole items per second; indicatif's own per_sec prints every decimal.
+fn rate(state: &ProgressState, w: &mut dyn std::fmt::Write) {
+	write!(w, "{:.0}/s", state.per_sec()).ok();
+}
+
 fn bar(mp: &MultiProgress, prefix: &'static str, len: usize) -> ProgressBar {
 	let style = ProgressStyle::with_template(
 		"{prefix:>7} {bar:40.cyan/blue} {pos:>6}/{len:6} \
-		{per_sec:>10} eta {eta}",
+		{rate:>8} eta {eta}",
 	)
 	.unwrap()
+	.with_key("rate", rate)
 	.progress_chars("━╸ ");
 	let pb = mp.add(ProgressBar::new(len as u64));
 	pb.set_style(style);
@@ -105,13 +111,16 @@ pub fn run(
 	opts: &Options,
 ) -> Result<()> {
 	let hashes = hash_todo(entries, records);
-	let (images, videos) = match model {
+	let (images, mut videos) = match model {
 		Some(_) => (
 			todo(entries, records, Kind::Image),
 			todo(entries, records, Kind::Video),
 		),
 		None => (Vec::new(), Vec::new()),
 	};
+	// Largest first, so one long film doesn't start last and leave the
+	// other decoders idle.
+	videos.sort_by_key(|&i| std::cmp::Reverse(entries[i].size));
 	let mp = MultiProgress::new();
 	let bars = [
 		bar(&mp, "hash", hashes.len()),
@@ -121,9 +130,10 @@ pub fn run(
 	let frames = mp.add(ProgressBar::new_spinner());
 	frames.set_style(
 		ProgressStyle::with_template(
-			"{prefix:>7} {pos} embedded, {per_sec}",
+			"{prefix:>7} {pos} embedded, {rate}",
 		)
-		.unwrap(),
+		.unwrap()
+		.with_key("rate", rate),
 	);
 	frames.set_prefix("gpu");
 	let (ev_tx, ev_rx) = bounded::<Event>(4096);

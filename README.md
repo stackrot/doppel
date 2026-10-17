@@ -1,77 +1,158 @@
 # doppel
 
-Duplicate and near-duplicate finder for images and videos that keeps every
-part of the machine busy at once:
+doppel finds duplicate images and videos on Linux, including copies that
+have been resized, re-encoded, cropped, filtered, watermarked or trimmed. It
+runs every stage in parallel so the CPU, GPU, video decoders and disks all
+stay busy, then opens a terminal screen where you review each group and send
+the copies you don't want to the Trash.
 
-| Stage | Hardware |
+It needs a GPU with a Vulkan driver. There is no CUDA or ROCm dependency,
+so AMD cards work out of the box.
+
+## What it finds
+
+| Match | Meaning |
 | --- | --- |
-| BLAKE3 hashing of same-size files (mmap, multi-threaded per file) | NVMe/SATA queues, its own thread pool |
-| Image decode (libjpeg-turbo DCT downscaling), border trim, pHash | every CPU core (rayon) |
-| Video: full decode, 1 frame per 2 s, scaled on the GPU | both VCN engines (VAAPI), plus software decoders |
-| DINOv2 ViT-B/14, fp16 matmuls and attention, fp32 residual stream | GPU via Vulkan cooperative matrices (RDNA3 WMMA) |
-| Whitened all-pairs similarity search (blocked fp16 matmul + top-k) | GPU |
+| exact | Byte-identical files. |
+| near | The same picture or footage saved again: resized, recompressed, converted to another format, or stored rotated with an EXIF tag. |
+| similar | Edited copies (crops, colour changes, blur, text or logos on top, added borders, mirrored, trimmed or sped-up clips, compilations) and burst shots of the same moment. |
 
-The GPU runs through [burn](https://burn.dev) on Vulkan, so there is no ROCm
-dependency. A cold run is GPU-bound; a CPU embedding worker was measured at
-2% of the GPU's rate and left out. Results go in an SQLite cache
-(`~/.cache/doppel/cache.sqlite`) keyed on path, size and mtime, so later runs
-only analyse new or changed files.
+A trimmed clip groups with the video it came from, and a compilation groups
+with each of the clips inside it.
 
-## Matches
+## Requirements
 
-- **exact**: byte-identical.
-- **near**: the same picture or footage re-encoded, resized, recompressed,
-  format-converted or EXIF-rotated (pHash agrees, or both videos cover each
-  other).
-- **similar**: edited copies (crops, filters, overlays, borders, mirrored,
-  trimmed or sped-up clips, compilations) and burst shots of one moment.
+- Linux with a Vulkan GPU driver. Software renderers such as lavapipe are
+  ignored because they would take hours.
+- ffmpeg and ffprobe.
+- A VAAPI driver if you want video decoded on the GPU. Without one, doppel
+  decodes on the CPU.
+- libjpeg-turbo, SQLite and curl.
+- Rust 1.95 or newer to build it.
 
-Each image (and each sampled frame) is described by GeM-pooled DINOv2 patch
-tokens rather than the CLS token, which is too semantic: two different
-photos of zebras score like an edited copy. Descriptors are PCA-whitened
-against the library's own distribution, blended with a prior fitted on 45k
-COCO photos (`assets/whiten-prior.bin`), so small libraries behave and large
-ones adapt (a thousand screenshots of one desktop stop looking alike).
-Letterbox, pillarbox and mat borders are trimmed before cropping.
+Only one setup has been tested: an AMD RX 7800 XT with Mesa's RADV driver on
+CachyOS. NVIDIA and Intel GPUs should work through Vulkan but have not been
+tried.
 
-Videos match when most sampled frames of the shorter one have a close frame
-in the other, so a trimmed clip groups with its source.
+To see images in the review screen, use a terminal that supports the kitty
+graphics protocol or sixel, such as kitty, WezTerm, foot or Konsole. Other
+terminals show a coarse preview made of block characters.
 
-Groups form around the best-connected file, and every member matches that
-leader directly, so look-alikes can't chain into giant groups. The suggested
-keeper is the best-ranked member: most pixels, then longest, highest
-bitrate, largest, oldest, shortest path.
+## Install
+
+Clone the repository, then:
+
+```
+cargo install --path .
+```
+
+The first run downloads the DINOv2 model weights (346 MB) into
+`~/.cache/doppel/` and checks them against a pinned SHA-256.
 
 ## Usage
 
 ```
-doppel [-t 0.70] [--frame-threshold 0.60] [--exact] [--json] [--no-vaapi] DIR...
+doppel ~/Pictures ~/Videos
 ```
 
-The first run downloads the DINOv2 weights (346 MB, pinned revision,
-SHA-256 checked). Lower thresholds find more edits and more look-alikes.
+doppel keeps what it learns about each file in `~/.cache/doppel/cache.sqlite`
+and only analyses new or changed files on later runs. It skips hidden
+directories (including the Trash), does not follow symlinks, and counts
+hardlinks to the same file once.
 
-Review keys: `↑↓` file, `←→`/Tab group, `space` toggle mark, `a` keep best
-and mark the rest, `u` keep all, `o` open, `t` trash marked files in this
-group, `T` trash every marked file, `q` quit. Exact and near groups start
-marked (best kept); in similar groups only redundant byte-identical copies
-(same letter in the `≡` column) start marked. Files go to the freedesktop
-Trash, and a group with every copy marked is skipped.
+| Option | Effect |
+| --- | --- |
+| `-t, --threshold` | How alike two images must be to match, from 0 to 1 (default 0.70). Lower values catch heavier edits but also more look-alike photos. |
+| `--frame-threshold` | The same for video frames (default 0.60). |
+| `-e, --exact` | Only find byte-identical files. No decoding, no GPU. |
+| `--json` | Print the groups as JSON instead of opening the review screen. |
+| `--no-vaapi` | Decode video on the CPU. |
 
-## Sample corpus
+`doppel --help` lists the rest.
 
-`tools/make_samples.py` builds a test corpus with ground truth from COCO
-images and Blender open movies (download list in its docstring);
-`tools/score.py` scores `doppel --json` output against it, and
-`tools/fit_prior.py` refits the whitening prior from a populated cache.
+### Reviewing
+
+| Key | Action |
+| --- | --- |
+| `↑` `↓` | Move between files |
+| `←` `→` or Tab | Move between groups |
+| Space | Mark or unmark a file |
+| `a` | Keep the best file, mark the rest |
+| `u` | Keep every file in the group |
+| `o` | Open the file in its default viewer |
+| `t` | Move the marked files in this group to the Trash |
+| `T` | Move every marked file to the Trash |
+| `q` | Quit |
+
+The best file in each group (most pixels, then longest, highest bitrate,
+largest, oldest) is listed first with a star. In exact and near groups,
+everything else starts marked. In similar groups, only spare copies of
+byte-identical files start marked; those share a letter in the `≡` column.
+Files go to the freedesktop Trash, so you can restore them, and doppel will
+not empty a group completely.
+
+## How it works
+
+| Stage | Runs on |
+| --- | --- |
+| BLAKE3 hashing of files that share a size | disks, on its own thread pool |
+| Image decoding, border trimming, perceptual hash | all CPU cores; JPEGs are downscaled while decoding |
+| Video decoding, one frame every 2 seconds (less often past 20 minutes) | the GPU's video engines through VAAPI, plus CPU decoders |
+| DINOv2 ViT-B/14 descriptors | GPU, through Vulkan with fp16 matrix units |
+| Comparing every file with every other | GPU |
+
+The GPU code uses [burn](https://burn.dev). On large libraries the model is
+the slowest stage and the other stages keep it busy. Running the model on the
+CPU as well was tried and added only 2%.
+
+Each picture, and each sampled video frame, is described by GeM-pooled
+DINOv2 patch features rather than the model's CLS token. The CLS token is
+too concerned with what a photo shows, so two different photos of zebras can
+score like an edited copy. doppel then whitens the descriptors against your
+library's own statistics, blended with a prior computed from 45,000 COCO
+photos. In a folder of a thousand screenshots of one desktop, that stops the
+shared desktop from making every screenshot match. A perceptual hash
+confirms near copies that the model alone rates lower, such as heavy
+downscales.
+
+Two videos match when most sampled frames of the shorter one have a close
+frame in the other.
+
+Each group forms around the file with the most matches, and every other file
+in the group matches that file directly. This stops a chain of look-alikes
+from merging into one huge group.
+
+## Accuracy and speed
+
+These figures come from a synthetic test corpus, not real photo libraries:
+72,340 images (45,670 COCO photos plus edited copies of 6,000 of them) and
+94 videos cut from Blender open movies, 13 GB in total. On a Ryzen 7 9700X
+with an RX 7800 XT, the first run took 185 seconds and a repeat run took 4.
+
+| | Precision | Recall | Near-copy recall |
+| --- | --- | --- | --- |
+| Images | 0.95 | 0.94 | 0.999 |
+| Videos | 1.00 | 0.96 | 1.00 |
+
+Precision counts how many files in each group really match the file the
+group formed around. Most of the image misses are burst shots of the same
+scene, which the corpus labels as different photos. Crops that keep only
+36% of the picture are mostly missed (26% found).
+
+To rebuild the corpus and score doppel against it:
 
 ```
+tools/fetch_samples.sh ROOT
 python -I tools/make_samples.py ROOT
 doppel --json ROOT/corpus > out.json
 python -I tools/score.py ROOT out.json
 ```
 
-On that corpus (72k images, 94 videos, 13 GB; 9700X + RX 7800 XT): 185 s
-cold, 4 s warm. Images: 0.95 precision against the leader (most misses are
-burst shots), 0.94 recall (near 0.999). Videos: 1.00 precision, 0.96
-recall.
+`tools/fit_prior.py` recomputes `assets/whiten-prior.bin` from a cache
+filled by running doppel on the corpus.
+
+## Licence
+
+MIT. The DINOv2 weights (Meta, Apache-2.0) are downloaded at first run, not
+bundled. `assets/whiten-prior.bin` holds only the mean and covariance of
+DINOv2 descriptors computed from COCO 2017 images.

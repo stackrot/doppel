@@ -1,9 +1,10 @@
 use std::collections::HashSet;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 use anyhow::{Context, Result, bail};
+use burn_tensor::wgpu::WgpuBackend;
 use burn_tensor::{Device, DeviceKind};
 use clap::Parser;
 use serde::Serialize;
@@ -23,32 +24,31 @@ struct Args {
 	/// Directories to scan.
 	#[arg(required = true)]
 	paths: Vec<PathBuf>,
-	/// Similarity (whitened cosine, 0-1) at or above which two images
-	/// count as the same picture. Lower finds more edits and more
-	/// look-alikes.
+	/// How alike two images must be to match, from 0 to 1. Lower values
+	/// catch heavier edits but also more look-alike photos.
 	#[arg(short, long, default_value_t = 0.70)]
 	threshold: f32,
-	/// The same for sampled video frames.
+	/// How alike two video frames must be to match, from 0 to 1.
 	#[arg(long, default_value_t = 0.60)]
 	frame_threshold: f32,
-	/// Byte-identical files only: no decoding, no GPU.
+	/// Only find byte-identical files. Skips decoding and needs no GPU.
 	#[arg(short, long)]
 	exact: bool,
-	/// Print groups as JSON instead of opening the review UI.
+	/// Print the groups as JSON instead of opening the review screen.
 	#[arg(long)]
 	json: bool,
-	/// Decode video in software instead of VAAPI.
+	/// Decode video on the CPU instead of with VAAPI.
 	#[arg(long)]
 	no_vaapi: bool,
-	/// Concurrent ffmpeg video decoders (VAAPI unless --no-vaapi).
+	/// Number of video decoders (VAAPI unless --no-vaapi).
 	#[arg(long, default_value_t = 4)]
 	video_jobs: usize,
-	/// Additional software video decoders.
+	/// Number of extra CPU video decoders.
 	#[arg(long, default_value_t = 2)]
 	cpu_video_jobs: usize,
-	/// Concurrent hashing threads.
-	#[arg(long, default_value_t = 16)]
-	hash_jobs: usize,
+	/// Number of hashing threads [default: CPU threads].
+	#[arg(long)]
+	hash_jobs: Option<usize>,
 }
 
 const WEIGHTS_URL: &str = concat!(
@@ -60,7 +60,7 @@ const WEIGHTS_SHA256: &str =
 
 fn cache_dir() -> Result<PathBuf> {
 	Ok(dirs::cache_dir()
-		.context("no cache directory")?
+		.context("cannot find a cache directory")?
 		.join("doppel"))
 }
 
@@ -99,7 +99,7 @@ fn weights() -> Result<PathBuf> {
 	}
 	if sha256(&part)? != WEIGHTS_SHA256 {
 		std::fs::remove_file(&part).ok();
-		bail!("weights checksum mismatch");
+		bail!("downloaded weights failed their checksum");
 	}
 	std::fs::rename(&part, &path)?;
 	Ok(path)
@@ -159,8 +159,44 @@ fn print_json(
 	Ok(())
 }
 
+/// The first discrete, else integrated, Vulkan GPU. Software rasterisers
+/// such as lavapipe are skipped: they would take hours.
+fn gpu() -> Result<Device> {
+	for kind in [DeviceKind::DiscreteGpu(0), DeviceKind::IntegratedGpu(0)] {
+		let dev = Device::wgpu_options()
+			.graphics_api(WgpuBackend::Vulkan)
+			.device_kind(kind)
+			.init();
+		if let Ok(dev) = dev {
+			return Ok(dev);
+		}
+	}
+	bail!("no Vulkan GPU found; similarity matching needs one \
+		(--exact works without)")
+}
+
+fn has_ffmpeg() -> bool {
+	["ffmpeg", "ffprobe"].iter().all(|tool| {
+		Command::new(tool)
+			.arg("-version")
+			.stdout(Stdio::null())
+			.stderr(Stdio::null())
+			.status()
+			.is_ok_and(|s| s.success())
+	})
+}
+
 fn main() -> Result<()> {
 	let args = Args::parse();
+	let device = if args.exact {
+		None
+	} else {
+		if !has_ffmpeg() {
+			bail!("ffmpeg and ffprobe are needed for similarity \
+				matching (--exact works without)");
+		}
+		Some(gpu()?)
+	};
 	let mut roots = Vec::new();
 	for p in &args.paths {
 		let p = p
@@ -185,8 +221,6 @@ fn main() -> Result<()> {
 	cache.prune(&cached, &roots, &seen)?;
 	drop(cached);
 
-	let device = (!args.exact)
-		.then(|| Device::vulkan(DeviceKind::DefaultDevice));
 	let model = match &device {
 		Some(dev) => Some(Dino::load(&weights()?, dev)?),
 		None => None,
@@ -195,7 +229,13 @@ fn main() -> Result<()> {
 		vaapi: !args.no_vaapi,
 		video_jobs: args.video_jobs.max(1),
 		cpu_video_jobs: args.cpu_video_jobs,
-		hash_jobs: args.hash_jobs.max(1),
+		hash_jobs: args
+			.hash_jobs
+			.unwrap_or_else(|| {
+				std::thread::available_parallelism()
+					.map_or(4, |n| n.get())
+			})
+			.max(1),
 	};
 	analyse::run(
 		&entries,
@@ -205,6 +245,11 @@ fn main() -> Result<()> {
 		&opts,
 	)?;
 	drop(model);
+	let failed = records.iter().filter(|r| r.failed).count();
+	if failed > 0 {
+		let files = tui::count(failed, "file");
+		eprintln!("skipped {files} that could not be decoded");
+	}
 	let t = group::Thresholds {
 		image: args.threshold,
 		frame: args.frame_threshold,
@@ -214,7 +259,8 @@ fn main() -> Result<()> {
 		return print_json(&entries, &records, &groups);
 	}
 	if groups.is_empty() {
-		eprintln!("no duplicates in {} files", entries.len());
+		let files = tui::count(entries.len(), "file");
+		eprintln!("no duplicates in {files}");
 		return Ok(());
 	}
 	tui::run(&entries, &records, groups)

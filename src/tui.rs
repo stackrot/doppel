@@ -192,6 +192,14 @@ fn human(bytes: u64) -> String {
 	}
 }
 
+pub fn count(n: usize, noun: &str) -> String {
+	if n == 1 {
+		format!("1 {noun}")
+	} else {
+		format!("{n} {noun}s")
+	}
+}
+
 /// Civil date from nanoseconds since the epoch (Howard Hinnant's algorithm).
 fn date(ns: i64) -> String {
 	let days = ns.div_euclid(86_400_000_000_000);
@@ -382,7 +390,8 @@ impl App<'_> {
 			return;
 		}
 		self.status = format!(
-			"move {n} files ({}) to Trash? y/n",
+			"move {} ({}) to Trash? y/n",
+			count(n, "file"),
 			human(bytes)
 		);
 		self.prompt = Some(p);
@@ -424,10 +433,12 @@ impl App<'_> {
 				g += 1;
 			}
 		}
-		self.status = format!("moved {moved} files to Trash");
+		self.status =
+			format!("moved {} to Trash", count(moved, "file"));
 		if skipped > 0 {
 			self.status += &format!(
-				", skipped {skipped} fully marked groups"
+				", skipped {} with every file marked",
+				count(skipped, "group")
 			);
 		}
 		if failed > 0 {
@@ -456,7 +467,7 @@ impl App<'_> {
 			human(self.freed)
 		);
 		f.render_widget(Paragraph::new(title).bold(), head);
-		let help = "↑↓ file  ←→ group  space mark  a auto  u keep all  \
+		let help = "↑↓ file  ←→ group  space mark  a keep best  u keep all  \
 			o open  t trash group  T trash all  q quit";
 		let foot_text = if self.status.is_empty() {
 			Line::from(help).dim()
