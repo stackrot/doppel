@@ -1,0 +1,10 @@
+[advisories]
+ignore = [
+	# chrono is unmaintained. It is only in Cargo.lock, through the optional
+	# persistence feature of burn's cubecl-environment, and is never built.
+	# Drop this when upgrading burn if it has left the lockfile.
+	"RUSTSEC-2026-0543",
+	# paste is unmaintained. burn and cubecl use the macro at build time and
+	# still do as of burn 0.23.0-pre.2. Drop this when burn stops using it.
+	"RUSTSEC-2024-0436",
+]

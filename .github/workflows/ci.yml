@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    # Ubuntu ships libjpeg-turbo 2.1, and turbojpeg-sys needs 3.0 or newer.
+    container: archlinux:latest
+    timeout-minutes: 60
+    steps:
+      - run: pacman -Syu --noconfirm --needed base-devel git libjpeg-turbo sqlite
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --locked --release --all-targets -- -D warnings
+      - run: cargo build --locked --release
+
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions-rust-lang/setup-rust-toolchain@a188e68d0fd2bd36ad51dccb2b07ba6e75105f30 # v2.0.1
+        with:
+          toolchain: stable
+      - run: cargo install cargo-audit --locked --version 0.23.0
+      # .cargo/audit.toml lists the only advisories allowed through.
+      - run: cargo audit --deny warnings
