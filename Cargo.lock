@@ -6105,7 +6105,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "81313fcd64aaa30ddfd59eaa122968136b2dd9cd41d9619b126cf71e67a01702"
 dependencies = [
  "gcd",
- "image",
  "libc",
  "thiserror 1.0.69",
  "turbojpeg-sys",
