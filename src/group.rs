@@ -208,10 +208,8 @@ fn video_edges(
 		}
 		let (ia, ib) = (ids[a as usize], ids[b as usize]);
 		let near = ca >= NEAR_COVER
-			&& cb >= NEAR_COVER && same_length(
-			&records[ia],
-			&records[ib],
-		);
+			&& cb >= NEAR_COVER
+			&& same_length(&records[ia], &records[ib]);
 		let link = if near { Link::Near } else { Link::Similar };
 		edges.push((ia, ib, link, short));
 	}
