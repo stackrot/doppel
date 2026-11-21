@@ -75,7 +75,7 @@ fn sha256(path: &Path) -> Result<String> {
 		}
 		h.update(&buf[..n]);
 	}
-	Ok(format!("{:x}", h.finalize()))
+	Ok(h.finalize().iter().map(|b| format!("{b:02x}")).collect())
 }
 
 /// Fetches the pinned DINOv2 weights on first use.
