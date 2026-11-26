@@ -71,8 +71,8 @@ cargo install cargo-audit --locked --version 0.23.0
 cargo audit --deny warnings
 ```
 
-CI runs these on every push and PR. `.cargo/audit.toml` lists the only
-advisories the audit lets through.
+CI runs these on every PR and on pushes to `main`. `.cargo/audit.toml` lists
+the only advisories the audit lets through.
 
 There's no test suite, and CI doesn't run doppel itself. To measure
 accuracy, install it with `cargo install --path .` and score it against the
