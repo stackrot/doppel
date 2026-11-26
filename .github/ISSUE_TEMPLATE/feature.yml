@@ -1,0 +1,17 @@
+name: Feature
+description: New behaviour or a new capability
+labels: [feature]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What it should do
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why
+      description: The problem it solves, or who it's for.
+    validations:
+      required: false
