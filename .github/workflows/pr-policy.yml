@@ -1,0 +1,15 @@
+name: PR policy
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  policy:
+    uses: stackrot/.github/.github/workflows/reusable-pr-policy.yml@main

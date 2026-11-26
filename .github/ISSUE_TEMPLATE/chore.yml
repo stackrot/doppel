@@ -1,0 +1,10 @@
+name: Chore
+description: Maintenance such as dependencies, CI, tooling or docs
+labels: [chore]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs doing, and why
+    validations:
+      required: true

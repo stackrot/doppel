@@ -1,0 +1,23 @@
+name: Bug
+description: Something doesn't work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected and what you got instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: false
+  - type: textarea
+    id: context
+    attributes:
+      label: Version, logs or screenshots
+    validations:
+      required: false
