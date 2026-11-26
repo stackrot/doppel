@@ -1,7 +1,7 @@
 # Contributing
 
-One person maintains this repo, and the process below applies to every
-change, including the maintainer's own and anything an AI agent writes.
+One person maintains this repo. Every change from anyone else, including AI
+agents working for anyone else, follows the process below.
 
 ## How a change lands
 
@@ -22,8 +22,9 @@ change, including the maintainer's own and anything an AI agent writes.
 6. Once every required check passes and every thread is resolved, the PR is
    squash-merged and its branch deleted.
 
-Nobody pushes straight to the default branch, the maintainer included. The
-branch ruleset blocks it.
+The branch ruleset blocks direct pushes to the default branch for everyone
+except the maintainer. The maintainer, and AI agents working as the
+maintainer, push straight to it.
 
 ## Commit messages and PR titles
 
